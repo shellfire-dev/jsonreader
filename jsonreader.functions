@@ -148,7 +148,7 @@ _jsonreader_parseArray()
 			_jsonreader_skipWhitespace
 		fi
 		
-		jsonreader_path="${originalPath}:${index}"
+		jsonreader_path="${originalPath}:$(printf '%08d' "$index")"
 		_jsonreader_parseValue
 		
 		index=$((index+1))
