@@ -1,9 +1,31 @@
 core_usesIn unicode utf8 utf16
 
+jsonreader_eventMatches()
+{
+	local pathGlob="$1"
+	local kind="$2"
+	local variant="$3"
+	shift 3
+	
+	if ! core_variable_matches "$jsonreader_path" $pathGlob; then
+		return 1
+	fi
+	
+	if [ "$kind" != "$eventKind" ]; then
+		return 1
+	fi
+	
+	if [ "$variant" != "$eventVariant" ]; then
+		return 1
+	fi
+	
+	return 0
+}
+
 jsonreader_parse()
 {
 	local jsonFilePath="$1"
-	local _jsonreader_event="$2"
+	local _jsonreader_eventCallback="$2"
 	
 	if core_variable_isUnset _jsonreader_singleCharactersFilePath; then
 		_jsonreader_initialise
@@ -40,6 +62,16 @@ _jsonreader_initialise()
 	_jsonreader_LF=''
 	
 	jsonreader_path_index=[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
+}
+
+_jsonreader_raiseEvent()
+{
+	local eventCallback="$1"
+	local eventKind="$2"
+	local eventVariant="$3"
+	local eventValue="$4"
+	
+	$eventCallback
 }
 
 _jsonreader_errorEndOfFile()
@@ -102,7 +134,7 @@ _jsonreader_parseValue()
 		;;
 		
 		'"')
-			_jsonreader_parseString $_jsonreader_event
+			_jsonreader_parseString $_jsonreader_eventCallback
 		;;
 		
 		'-'|'0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9')
@@ -130,7 +162,7 @@ _jsonreader_parseArray()
 {
 	local originalPath="$jsonreader_path"
 	local jsonreader_path="${originalPath}:"
-	$_jsonreader_event array start
+	_jsonreader_raiseEvent $_jsonreader_eventCallback array start
 	
 	local index=0
 	while true
@@ -139,7 +171,7 @@ _jsonreader_parseArray()
 		
 		if [ "$character" = ']' ]; then
 			jsonreader_path="${originalPath}:"
-			$_jsonreader_event array end $((index+1))
+			_jsonreader_raiseEvent $_jsonreader_eventCallback array end $((index+1))
 			return 0
 		fi
 		
@@ -162,7 +194,7 @@ _jsonreader_parseObject()
 {
 	local originalPath="$jsonreader_path"
 	local jsonreader_path="${originalPath}/"
-	$_jsonreader_event object start
+	_jsonreader_raiseEvent $_jsonreader_eventCallback object start
 	
 	local index=0
 	local key
@@ -172,7 +204,7 @@ _jsonreader_parseObject()
 		
 		if [ "$character" = '}' ]; then
 			jsonreader_path="${originalPath}/"
-			$_jsonreader_event object end $((index+1))
+			_jsonreader_raiseEvent $_jsonreader_eventCallback object end $((index+1))
 			return 0
 		fi
 		
@@ -216,7 +248,7 @@ _jsonreader_parseNull()
 	if [ "$buffer" != 'null' ]; then
 		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'null', not '$buffer'"
 	fi
-	$_jsonreader_event value null
+	_jsonreader_raiseEvent $_jsonreader_eventCallback value null null
 	buffer=''
 }
 
@@ -231,7 +263,7 @@ _jsonreader_parseTrue()
 	if [ "$buffer" != 'true' ]; then
 		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'true', not '$buffer'"
 	fi
-	$_jsonreader_event value true
+	_jsonreader_raiseEvent $_jsonreader_eventCallback value true true
 	buffer=''
 }
 
@@ -247,13 +279,13 @@ _jsonreader_parseFalse()
 	if [ "$buffer" != 'false' ]; then
 		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'false', not '$buffer'"
 	fi
-	$_jsonreader_event value false
+	_jsonreader_raiseEvent $_jsonreader_eventCallback value false false
 	buffer=''
 }
 
 _jsonreader_parseString()
 {
-	local event="$1"
+	local eventCallback="$1"
 	
 	buffer=''
 	while _jsonreader_next
@@ -261,7 +293,7 @@ _jsonreader_parseString()
 		case "$character" in 
 			
 			'"')
-				$event value string "$buffer"
+				_jsonreader_raiseEvent $eventCallback value string "$buffer"
 				return 0
 			;;
 			
@@ -438,7 +470,7 @@ _jsonreader_parseNumber()
 			*)
 				pushBackForNumberParsing="$character"
 				# can be '-0'
-				$_jsonreader_event value number "$number"
+				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
 				return 0
 			;;
 			
@@ -468,7 +500,7 @@ _jsonreader_parseNumber()
 			
 			*)
 				pushBackForNumberParsing="$character"
-				$_jsonreader_event value number "$number"
+				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
 				return 0
 			;;
 			
@@ -509,7 +541,7 @@ _jsonreader_parseNumber_fraction()
 			
 			*)
 				pushBackForNumberParsing="$character"
-				$_jsonreader_event value number "$number"
+				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
 				return 0
 			;;
 			
@@ -560,7 +592,7 @@ _jsonreader_parseNumber_exponent()
 		
 			*)
 				pushBackForNumberParsing="$character"
-				$_jsonreader_event value number "$number"
+				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
 				return 0
 			;;
 		
@@ -582,7 +614,7 @@ _jsonreader_next()
 _jsonreader_errorEndOfFileIfNotParsingRootNumber()
 {
 	if core_variable_isTrue "$eofIsAllowedInParsingNumberBecauseThisIsRootValue"; then
-		$_jsonreader_event value number "$number"
+		_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
 	else
 		_jsonreader_errorEndOfFile
 	fi
