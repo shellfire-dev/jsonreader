@@ -578,7 +578,7 @@ _jsonreader_next()
 
 _jsonreader_errorEndOfFileIfNotParsingRootNumber()
 {
-	if core_variable_isTrue "$eofIsAllowedInParsingNumberBecauseThisIsRootValue"
+	if core_variable_isTrue "$eofIsAllowedInParsingNumberBecauseThisIsRootValue"; then
 		$event_value_number "$number"
 	else
 		_jsonreader_errorEndOfFile
