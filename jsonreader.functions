@@ -606,6 +606,7 @@ _jsonreader_next()
 	if [ -n "$pushBackForNumberParsing" ]; then
 		character="$pushBackForNumberParsing"
 		pushBackForNumberParsing=''
+		return
 	fi
 	
 	IFS='' read -r character
