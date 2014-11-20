@@ -162,7 +162,7 @@ _jsonreader_parseArray()
 {
 	local originalPath="$jsonreader_path"
 	local jsonreader_path="${originalPath}:"
-	_jsonreader_raiseEvent $_jsonreader_eventCallback array start
+	_jsonreader_raiseEvent $_jsonreader_eventCallback array start ''
 	
 	local index=0
 	while true
@@ -194,7 +194,7 @@ _jsonreader_parseObject()
 {
 	local originalPath="$jsonreader_path"
 	local jsonreader_path="${originalPath}/"
-	_jsonreader_raiseEvent $_jsonreader_eventCallback object start
+	_jsonreader_raiseEvent $_jsonreader_eventCallback object start ''
 	
 	local index=0
 	local key
