@@ -22,12 +22,13 @@ jsonreader_eventMatches()
 	return 0
 }
 
+core_usesIn core file
 jsonreader_parse()
 {
 	local jsonFilePath="$1"
 	local _jsonreader_eventCallback="$2"
 	
-	if core_variable_isUnset _jsonreader_singleCharactersFilePath; then
+	if core_variable_isUnset _jsonreader_SP; then
 		_jsonreader_initialise
 	fi
 	
@@ -37,25 +38,14 @@ jsonreader_parse()
 	local eofIsAllowedInParsingNumberBecauseThisIsRootValue=yes
 	local jsonreader_path=''
 	
-	_jsonreader_toSingleCharacters
-	{
-		_jsonreader_skipWhitespace
-		
-		_jsonreader_parseValue
-
+	core_file_characterByCharacter "$jsonFilePath" \
+		_jsonreader_skipWhitespace \
+		_jsonreader_parseValue \
 		_jsonreader_skipFinalWhitespace
-		
-	} <"$_jsonreader_singleCharactersFilePath"
 }
 
 _jsonreader_initialise()
 {
-	local TMP_FILE
-	
-	# Used to pass sensitive URLs and Headers (eg those containing passwords) that should not be leaked to the command-line (eg those containing sensitive tokens - GitHub's API is an example of this)
-	core_temporaryFiles_newFileToRemoveOnExit
-	_jsonreader_singleCharactersFilePath="$TMP_FILE"
-	
 	_jsonreader_SP=' '
 	_jsonreader_HT="$(printf '\t')"
 	_jsonreader_CR="$(printf '\r')"
@@ -625,25 +615,4 @@ _jsonreader_nextToBuffer()
 {
 	_jsonreader_next
 	buffer="${buffer}${character}"
-}
-
-_jsonreader_toSingleCharacters()
-{
-	if core_variable_isUnset _jsonreader_singleCharactersFilePath; then
-		_jsonreader_initialise
-	fi
-	
-	awk '
-BEGIN {
-	srand()
-	FS=""
-	RS="n/o/m/a/t/c/h" rand()
-}
-
-{
-	for (i = 1; i <= NF; i++)
-	{
-		print $i
-	}
-}' <"$jsonFilePath" >"$_jsonreader_singleCharactersFilePath"
 }
