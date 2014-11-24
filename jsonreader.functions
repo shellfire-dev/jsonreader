@@ -18,11 +18,10 @@ jsonreader_eventMatches()
 	fi
 	
 	local variant="$3"
-	
 	if [ "$variant" != "$eventVariant" ]; then
 		return 1
 	fi
-	
+	return 0
 }
 
 core_usesIn core file
