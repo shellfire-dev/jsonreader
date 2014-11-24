@@ -148,28 +148,28 @@ _jsonreader_parseArray()
 	local jsonreader_path="${originalPath}:"
 	_jsonreader_raiseEvent $_jsonreader_eventCallback array start ''
 	
-	local index=0
+	local arrayIndex=0
 	while true
 	do
 		_jsonreader_skipWhitespace
 		
 		if [ "$character" = ']' ]; then
 			jsonreader_path="${originalPath}:"
-			_jsonreader_raiseEvent $_jsonreader_eventCallback array end $((index+1))
+			_jsonreader_raiseEvent $_jsonreader_eventCallback array end $((arrayIndex+1))
 			return 0
 		fi
 		
-		if [ $index -ne 0 ]; then
+		if [ $arrayIndex -ne 0 ]; then
 			if [ "$character" != ',' ]; then
 				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in array"
 			fi
 			_jsonreader_skipWhitespace
 		fi
 		
-		jsonreader_path="${originalPath}:$(printf '%08d' "$index")"
+		jsonreader_path="${originalPath}:$(printf '%08d' "$arrayIndex")"
 		_jsonreader_parseValue
 		
-		index=$((index+1))
+		arrayIndex=$((arrayIndex+1))
 		
 	done
 }
@@ -180,7 +180,7 @@ _jsonreader_parseObject()
 	local jsonreader_path="${originalPath}/"
 	_jsonreader_raiseEvent $_jsonreader_eventCallback object start ''
 	
-	local index=0
+	local objectIndex=0
 	local key
 	while true
 	do
@@ -188,11 +188,11 @@ _jsonreader_parseObject()
 		
 		if [ "$character" = '}' ]; then
 			jsonreader_path="${originalPath}/"
-			_jsonreader_raiseEvent $_jsonreader_eventCallback object end $((index+1))
+			_jsonreader_raiseEvent $_jsonreader_eventCallback object end $((objectIndex+1))
 			return 0
 		fi
 		
-		if [ $index -ne 0 ]; then
+		if [ $objectIndex -ne 0 ]; then
 			if [ "$character" != ',' ]; then
 				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in object"
 			fi
@@ -217,7 +217,7 @@ _jsonreader_parseObject()
 		jsonreader_path="${originalPath}/${key}"
 		_jsonreader_parseValue
 		
-		index=$((index+1))
+		objectIndex=$((objectIndex+1))
 	done
 }
 
