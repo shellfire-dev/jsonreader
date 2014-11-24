@@ -3,23 +3,26 @@ core_usesIn unicode utf8 utf16
 jsonreader_eventMatches()
 {
 	local pathGlob="$1"
-	local kind="$2"
-	local variant="$3"
-	shift 3
 	
 	if ! core_variable_matches "$jsonreader_path" $pathGlob; then
 		return 1
+	elif [ $# -eq 1 ]; then
+		return 0
 	fi
 	
+	local kind="$2"
 	if [ "$kind" != "$eventKind" ]; then
 		return 1
+	elif [ $# -eq 2 ]; then
+		return 0
 	fi
+	
+	local variant="$3"
 	
 	if [ "$variant" != "$eventVariant" ]; then
 		return 1
 	fi
 	
-	return 0
 }
 
 core_usesIn core file
