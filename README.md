@@ -1,4 +1,4 @@
-# `github`: functions module for [shellfire]
+# `jsonreader`: functions module for [shellfire]
 
 This module provides a simple framework for parsing JSON with a [shellfire] application. Since JSON and shell script don't mix easily, we user an event-based parser with callbacks. In _any POSIX shell_ - not just bash! This allows handling of JSON of arbitrary complexity, as long as:-
 
