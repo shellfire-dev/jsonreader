@@ -174,4 +174,5 @@ Helper function to match events. Use the value `jsonreader_path_index` to glob-m
 [jsonwriter]: https://github.com/shellfire-dev/jsonwriter "jsonwriter shellfire module homepage"
 [jsonreader]: https://github.com/shellfire-dev/jsonreader "jsonreader shellfire module homepage"
 [urlencode]: https://github.com/shellfire-dev/urlencode "urlencode shellfire module homepage"
+[unicode]: https://github.com/shellfire-dev/unicode "unicode shellfire module homepage"
 [version]: https://github.com/shellfire-dev/version "version shellfire module homepage"
