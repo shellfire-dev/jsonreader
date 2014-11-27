@@ -141,6 +141,7 @@ The callback function is passed no arguments, but has the variables `jsonreader_
 |`eventKind`|`eventVariant`|`eventValue` Example|`jsonreader_path` Example|
 |-----------|--------------|--------------------|-------------------------|
 |`object`|`start`|_Always empty_|`/`, `/author/`. Always ends in `/`.|
+|`object`|`key`|Value of key|`/`, `/author/`. Always ends in `/`.|
 |`object`|`end`|`5` - count of fields|`/`, `/author/`. Always ends in `/`.|
 |`array`|`start`|_Always empty_|`:`, `/author:`. Always ends in `:`.|
 |`array`|`end`|`5` - count of fields|`:`, `/author:`. Always ends in `:`.|

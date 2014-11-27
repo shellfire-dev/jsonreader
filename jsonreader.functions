@@ -26,6 +26,10 @@ jsonreader_parse()
 		_jsonreader_initialise
 	fi
 	
+	local eventKind='root'
+	local index=0
+	local key
+	
 	local buffer=''
 	local character=''
 	local pushBackForNumberParsing=''
@@ -38,6 +42,323 @@ jsonreader_parse()
 		_jsonreader_skipFinalWhitespace
 }
 
+_jsonreader_raiseEvent()
+{
+	# eventKind
+	# root / array / object
+	
+	# eventIndex (number)
+	
+	# eventKey (if set)
+	
+	# start / end / boolean / string / number
+	local eventVariant="$1"
+	
+	# null / true / false / number / string / '' / count
+	local eventValue="$2"
+		
+	$_jsonreader_eventCallback
+}
+
+_jsonreader_parseValue()
+{
+	case "$character" in
+		
+		'n')
+			_jsonreader_parseNull
+		;;
+		
+		't')
+			_jsonreader_parseTrue
+		;;
+		
+		'f')
+			_jsonreader_parseFalse
+		;;
+		
+		'"')
+			_jsonreader_parseString false
+		;;
+		
+		'-'|'0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9')
+			_jsonreader_parseNumber
+		;;
+		
+		'[')
+			eofIsAllowedInParsingNumberBecauseThisIsRootValue=no
+			_jsonreader_parseArray
+		;;
+		
+		'{')
+			eofIsAllowedInParsingNumberBecauseThisIsRootValue=no
+			_jsonreader_parseObject
+		;;
+		
+		*)
+			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character'"
+		;;
+		
+	esac
+}
+
+_jsonreader_parseArray()
+{
+	local originalPath="$jsonreader_path"
+	local jsonreader_path="${originalPath}:"
+	local eventKind=array
+	_jsonreader_raiseEvent start ''
+	
+	local oldEventIndex=$eventIndex
+	if core_variable_isSet key; then
+		local oldEventKey="$eventKey"
+	fi
+	
+	local eventIndex=0
+	local eventKey
+	while true
+	do
+		_jsonreader_skipWhitespace
+		
+		if [ "$character" = ']' ]; then
+			jsonreader_path="${originalPath}:"
+			
+			local count=$((eventIndex+1))
+			eventIndex=$oldEventIndex
+			if core_variable_isSet oldEventKey; then
+				eventKey="$oldEventKey"
+			fi
+			
+			_jsonreader_raiseEvent end $count
+			return 0
+		fi
+		
+		if [ $arrayIndex -ne 0 ]; then
+			if [ "$character" != ',' ]; then
+				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in array"
+			fi
+			_jsonreader_skipWhitespace
+		fi
+		
+		jsonreader_path="${originalPath}:$(printf '%08d' "$arrayIndex")"
+		_jsonreader_parseValue
+		
+		eventIndex=$((eventIndex+1))
+		
+	done
+}
+
+_jsonreader_parseObject()
+{
+	local originalPath="$jsonreader_path"
+	local jsonreader_path="${originalPath}/"
+	local eventKind=object
+	_jsonreader_raiseEvent start ''
+	
+	local oldEventIndex=$eventIndex
+	if core_variable_isSet key; then
+		local oldEventKey="$eventKey"
+	fi
+	
+	local eventIndex=0
+	local eventKey
+	while true
+	do
+		_jsonreader_skipWhitespace
+		
+		if [ "$character" = '}' ]; then
+			jsonreader_path="${originalPath}/"
+			
+			local count=$((eventIndex+1))
+			eventIndex=$oldEventIndex
+			if core_variable_isSet oldEventKey; then
+				eventKey="$oldEventKey"
+			fi
+			
+			_jsonreader_raiseEvent end $count
+			return 0
+		fi
+		
+		if [ $objectIndex -ne 0 ]; then
+			if [ "$character" != ',' ]; then
+				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in object"
+			fi
+			_jsonreader_skipWhitespace
+		fi
+		
+		if [ "$character" != '"' ]; then
+			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' to start object key"
+		fi
+		
+		_jsonreader_parseString true
+		eventKey="$buffer"
+		
+		jsonreader_path="${originalPath}/"
+		_jsonreader_skipWhitespace
+		
+		if [ "$character" != ':' ]; then
+			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character'after object key"
+		fi
+		
+		_jsonreader_skipWhitespace
+		
+		jsonreader_path="${originalPath}/${eventKey}"
+		_jsonreader_parseValue
+		
+		eventIndex=$((eventIndex+1))
+	done
+}
+
+_jsonreader_parseNull()
+{
+	buffer="$character"
+	{
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+	} || _jsonreader_errorEndOfFile
+	if [ "$buffer" != 'null' ]; then
+		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'null', not '$buffer'"
+	fi
+	_jsonreader_raiseEvent boolean null
+	buffer=''
+}
+
+_jsonreader_parseTrue()
+{
+	buffer="$character"
+	{
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+	} || _jsonreader_errorEndOfFile
+	if [ "$buffer" != 'true' ]; then
+		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'true', not '$buffer'"
+	fi
+	_jsonreader_raiseEvent boolean true
+	buffer=''
+}
+
+_jsonreader_parseFalse()
+{
+	buffer="$character"
+	{
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+		_jsonreader_nextToBuffer
+	} || _jsonreader_errorEndOfFile
+	if [ "$buffer" != 'false' ]; then
+		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'false', not '$buffer'"
+	fi
+	_jsonreader_raiseEvent boolean false
+	buffer=''
+}
+
+_jsonreader_parseNumber()
+{
+	# We can't know we're "done" with a number until we drop off the end
+		# For object, array, we don't
+		# For string, true, false, null, we don't
+	# We can legitimately have EOF if this at the root level, thanks to RFC 7159
+	
+	local number="$character"
+	
+	case "$character" in
+		
+		'-')
+			_jsonreader_next || _jsonreader_errorEndOfFile
+			number="${number}${character}"
+		;;
+		
+	esac
+	
+	if [ "$character" = '0' ]; then
+		
+		_jsonreader_next || _jsonreader_errorEndOfFileIfNotParsingRootNumber
+		
+		case "$character" in
+			
+			'.')
+				_jsonreader_parseNumber_fraction
+				return 0
+			;;
+			
+			'e'|'E')
+				_jsonreader_parseNumber_exponent
+				return 0
+			;;
+			
+			*)
+				pushBackForNumberParsing="$character"
+				# can be '-0'
+				_jsonreader_raiseEvent number "$number"
+				return 0
+			;;
+			
+		esac
+		
+	fi
+	
+	while true
+	do
+		_jsonreader_next || _jsonreader_errorEndOfFileIfNotParsingRootNumber
+		
+		case "$character" in
+			
+			'.')
+				_jsonreader_parseNumber_fraction
+				return 0
+			;;
+			
+			'e'|'E')
+				_jsonreader_parseNumber_exponent
+				return 0
+			;;
+			
+			[0-9])
+				number="${number}${character}"
+			;;
+			
+			*)
+				pushBackForNumberParsing="$character"
+				_jsonreader_raiseEvent number "$number"
+				return 0
+			;;
+			
+		esac
+	done
+}
+
+_jsonreader_parseString()
+{
+	local raiseEvent="$1"
+	
+	buffer=''
+	while _jsonreader_next
+	do
+		case "$character" in 
+			
+			'"')
+				if $raiseEvent; then
+					_jsonreader_raiseEvent string "$buffer"
+				fi
+				return 0
+			;;
+			
+			'\')
+				_jsonreader_parseStringEscape
+			;;
+			
+			*)
+				buffer="${buffer}${character}"
+			;;
+			
+		esac
+	done
+	
+	_jsonreader_errorEndOfFile
+}
+
 _jsonreader_initialise()
 {
 	_jsonreader_SP=' '
@@ -46,16 +367,6 @@ _jsonreader_initialise()
 	_jsonreader_LF=''
 	
 	jsonreader_path_index=[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
-}
-
-_jsonreader_raiseEvent()
-{
-	local eventCallback="$1"
-	local eventKind="$2"
-	local eventVariant="$3"
-	local eventValue="$4"
-	
-	$eventCallback
 }
 
 _jsonreader_errorEndOfFile()
@@ -99,200 +410,6 @@ _jsonreader_skipFinalWhitespace()
 		
 		esac
 	done
-}
-
-_jsonreader_parseValue()
-{
-	case "$character" in
-		
-		'n')
-			_jsonreader_parseNull
-		;;
-		
-		't')
-			_jsonreader_parseTrue
-		;;
-		
-		'f')
-			_jsonreader_parseFalse
-		;;
-		
-		'"')
-			_jsonreader_parseString $_jsonreader_eventCallback
-		;;
-		
-		'-'|'0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9')
-			_jsonreader_parseNumber
-		;;
-		
-		'[')
-			eofIsAllowedInParsingNumberBecauseThisIsRootValue=no
-			_jsonreader_parseArray
-		;;
-		
-		'{')
-			eofIsAllowedInParsingNumberBecauseThisIsRootValue=no
-			_jsonreader_parseObject
-		;;
-		
-		*)
-			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character'"
-		;;
-		
-	esac
-}
-
-_jsonreader_parseArray()
-{
-	local originalPath="$jsonreader_path"
-	local jsonreader_path="${originalPath}:"
-	_jsonreader_raiseEvent $_jsonreader_eventCallback array start ''
-	
-	local arrayIndex=0
-	while true
-	do
-		_jsonreader_skipWhitespace
-		
-		if [ "$character" = ']' ]; then
-			jsonreader_path="${originalPath}:"
-			_jsonreader_raiseEvent $_jsonreader_eventCallback array end $((arrayIndex+1))
-			return 0
-		fi
-		
-		if [ $arrayIndex -ne 0 ]; then
-			if [ "$character" != ',' ]; then
-				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in array"
-			fi
-			_jsonreader_skipWhitespace
-		fi
-		
-		jsonreader_path="${originalPath}:$(printf '%08d' "$arrayIndex")"
-		_jsonreader_parseValue
-		
-		arrayIndex=$((arrayIndex+1))
-		
-	done
-}
-
-_jsonreader_parseObject()
-{
-	local originalPath="$jsonreader_path"
-	local jsonreader_path="${originalPath}/"
-	_jsonreader_raiseEvent $_jsonreader_eventCallback object start ''
-	
-	local objectIndex=0
-	local key
-	while true
-	do
-		_jsonreader_skipWhitespace
-		
-		if [ "$character" = '}' ]; then
-			jsonreader_path="${originalPath}/"
-			_jsonreader_raiseEvent $_jsonreader_eventCallback object end $((objectIndex+1))
-			return 0
-		fi
-		
-		if [ $objectIndex -ne 0 ]; then
-			if [ "$character" != ',' ]; then
-				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in object"
-			fi
-			_jsonreader_skipWhitespace
-		fi
-		
-		if [ "$character" != '"' ]; then
-			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' to start object key"
-		fi
-		
-		_jsonreader_parseString true
-		key="$buffer"
-		
-		_jsonreader_skipWhitespace
-		
-		if [ "$character" != ':' ]; then
-			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character'after object key"
-		fi
-		
-		_jsonreader_skipWhitespace
-		
-		jsonreader_path="${originalPath}/${key}"
-		_jsonreader_parseValue
-		
-		objectIndex=$((objectIndex+1))
-	done
-}
-
-_jsonreader_parseNull()
-{
-	buffer="$character"
-	{
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-	} || _jsonreader_errorEndOfFile
-	if [ "$buffer" != 'null' ]; then
-		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'null', not '$buffer'"
-	fi
-	_jsonreader_raiseEvent $_jsonreader_eventCallback value null null
-	buffer=''
-}
-
-_jsonreader_parseTrue()
-{
-	buffer="$character"
-	{
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-	} || _jsonreader_errorEndOfFile
-	if [ "$buffer" != 'true' ]; then
-		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'true', not '$buffer'"
-	fi
-	_jsonreader_raiseEvent $_jsonreader_eventCallback value true true
-	buffer=''
-}
-
-_jsonreader_parseFalse()
-{
-	buffer="$character"
-	{
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-		_jsonreader_nextToBuffer
-	} || _jsonreader_errorEndOfFile
-	if [ "$buffer" != 'false' ]; then
-		core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected 'false', not '$buffer'"
-	fi
-	_jsonreader_raiseEvent $_jsonreader_eventCallback value false false
-	buffer=''
-}
-
-_jsonreader_parseString()
-{
-	local eventCallback="$1"
-	
-	buffer=''
-	while _jsonreader_next
-	do
-		case "$character" in 
-			
-			'"')
-				_jsonreader_raiseEvent $eventCallback value string "$buffer"
-				return 0
-			;;
-			
-			'\')
-				_jsonreader_parseStringEscape
-			;;
-			
-			*)
-				buffer="${buffer}${character}"
-			;;
-			
-		esac
-	done
-	
-	_jsonreader_errorEndOfFile
 }
 
 _jsonreader_parseStringEscape()
@@ -417,81 +534,6 @@ _jsonreader_parseStringEscape_isLowSurrogateOnly()
 	core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing expected a low surrogate"
 }
 
-_jsonreader_parseNumber()
-{
-	# We can't know we're "done" with a number until we drop off the end
-		# For object, array, we don't
-		# For string, true, false, null, we don't
-	# We can legitimately have EOF if this at the root level, thanks to RFC 7159
-	
-	local number="$character"
-	
-	case "$character" in
-		
-		'-')
-			_jsonreader_next || _jsonreader_errorEndOfFile
-			number="${number}${character}"
-		;;
-		
-	esac
-	
-	if [ "$character" = '0' ]; then
-		
-		_jsonreader_next || _jsonreader_errorEndOfFileIfNotParsingRootNumber
-		
-		case "$character" in
-			
-			'.')
-				_jsonreader_parseNumber_fraction
-				return 0
-			;;
-			
-			'e'|'E')
-				_jsonreader_parseNumber_exponent
-				return 0
-			;;
-			
-			*)
-				pushBackForNumberParsing="$character"
-				# can be '-0'
-				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
-				return 0
-			;;
-			
-		esac
-		
-	fi
-	
-	while true
-	do
-		_jsonreader_next || _jsonreader_errorEndOfFileIfNotParsingRootNumber
-		
-		case "$character" in
-			
-			'.')
-				_jsonreader_parseNumber_fraction
-				return 0
-			;;
-			
-			'e'|'E')
-				_jsonreader_parseNumber_exponent
-				return 0
-			;;
-			
-			[0-9])
-				number="${number}${character}"
-			;;
-			
-			*)
-				pushBackForNumberParsing="$character"
-				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
-				return 0
-			;;
-			
-		esac
-	done
-}
-
 _jsonreader_parseNumber_fraction()
 {
 	number="${number}."
@@ -525,7 +567,7 @@ _jsonreader_parseNumber_fraction()
 			
 			*)
 				pushBackForNumberParsing="$character"
-				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
+				_jsonreader_raiseEvent number "$number"
 				return 0
 			;;
 			
@@ -576,7 +618,7 @@ _jsonreader_parseNumber_exponent()
 		
 			*)
 				pushBackForNumberParsing="$character"
-				_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
+				_jsonreader_raiseEvent number "$number"
 				return 0
 			;;
 		
@@ -599,7 +641,7 @@ _jsonreader_next()
 _jsonreader_errorEndOfFileIfNotParsingRootNumber()
 {
 	if core_variable_isTrue "$eofIsAllowedInParsingNumberBecauseThisIsRootValue"; then
-		_jsonreader_raiseEvent $_jsonreader_eventCallback value number "$number"
+		_jsonreader_raiseEvent number "$number"
 	else
 		_jsonreader_errorEndOfFile
 	fi
