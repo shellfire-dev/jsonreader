@@ -124,40 +124,55 @@ _program()
 }
 ```
 
+### Global Constants
+
+|Constant|Value|Explanation|
+|--------|-----|-----------|
+|`jsonreader_path_index`|`[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]`|Glob expression to match array indices in `jsonreader_path`. See below.|
+
 ### Functions
 
 ***
-#### `jsonreader_parse`
+#### `jsonreader_parse()`
 
 |Parameter|Value|Optional|
 |---------|-----|--------|
 |`jsonFilePath`|Path to a file that contains JSON.|_No_|
-|`_jsonreader_eventCallback`|Name of a function to callback.|_Yes_|
+|`eventCallback`|Name of a function to callback.|_Yes_|
 
-The callback function is passed no arguments, but has the variables `jsonreader_path`, `eventKind`, `eventVariant` and `eventValue` set. Additionally, depending on context, the variables `arrayIndex`, `objectIndex` and `key` may be set.
+The callback function is passed no arguments, but has the following variables available to it:-
 
-##### Event Kinds
-
-|`eventKind`|`eventVariant`|`eventValue` Example|`jsonreader_path` Example|
-|-----------|--------------|--------------------|-------------------------|
-|`object`|`start`|_Always empty_|`/`, `/author/`. Always ends in `/`.|
-|`object`|`key`|Value of key|`/`, `/author/`. Always ends in `/`.|
-|`object`|`end`|`5` - count of fields|`/`, `/author/`. Always ends in `/`.|
-|`array`|`start`|_Always empty_|`:`, `/author:`. Always ends in `:`.|
-|`array`|`end`|`5` - count of fields|`:`, `/author:`. Always ends in `:`.|
-|`value`|`string`|`hello world` - value of string|`:0000000005`, `/string`. Always ends in either the ordinal position of the field (zero-based) or the name of the field. If `object start` has happened, then `key` is the field name and `objectIndex` is the ordinal position. If `array start` has happened, then `arrayIndex` is the ordinal position. If there is a parent object or array, then the parent's ordinal position or key might be accessible.|
-|`value`|`number`|`-3.14E05` - value of number. Exponents normalised to `E`.|`:0000000005`, `/string`. As above for string.|
-|`value`|`true`|`true`|`:0000000005`, `/string`. As above for string.|
-|`value`|`false`|`false`|`:0000000005`, `/string`. As above for string.|
-|`value`|`null`|`null`|`:0000000005`, `/string`. As above for string.|
+|Variable|Description|
+|--------|-----------|
+|`eventKind`|The kind of event. One of `object`, `array` or `root` (if this is a solitary value; rare)|
+|`eventVariant`|The `start` or `end` of an object or array. The type of value: `boolean` (including null), `number` or `string`|
+|`eventValue`|Empty for `start`. Field count for `end`. `null`, `true` or `false` for boolean. Number or string. Numbers have exponent casing normalised to `E`|
+|`eventIndex`|Field index for `value` in array or object or 0 if value is a `root`. At `start` and `end`, field index in parent (this is logical but not obvious)|
+|`eventKey`|Field key for objects. Unset for arrays or if value is a `root`. At `start` and `end`, set to field key in parent if parent is an object.|
+|`jsonreader_path`|A path suitable for globbing representing where in the JSON we are.|
 
 ##### `jsonreader_path`
-`jsonreader_path` is used to quickly identify depth in the JSON graph. A `:` is used to denote an array, and a `/` for an object. Object keys are then post-fixed to `/`. Array indices are post-fixed, fixed-width, to `:`. The reason for the weird numbering syntax for array ordinal position is that the fixed width allows use of the shells' glob syntax, rather than a call out to `grep` - the width permits 99,999,999 entries in an array.
+`jsonreader_path` is used to quickly identify depth in the JSON graph. Examples best illustrate its values:-
 
-Matching the `jsonreader_path` can be done using the helper function `jsonreader_matches()`. 
+|Example|Sample JSON|Explanation
+|-------|-----------|----------|
+|_(empty)_|`true`|Only occurs for a `root` event|
+|`/`|`{"key":"value"}`|`start` or `end` of object|
+|`/key`|`{"key":"value"}`|`string` of key. `eventKey` is `key`, `eventIndex` is 0, `eventVariant` is `string`, `eventKind` is `object`|
+|`/key/`|`{"key":{"nested":"value"}}}`|`start` or `end` of nested object|
+|`/key/nested`|`{"key":{"nested":"value"}}}`|`string` of `nested`|
+|`:`|`["value"]`|`start` or `end` of array|
+|`:0000000005`|`[0,1,2,3,4,5.1e4]`|value of 6th element of the array (`5.1E4`)|
+|`:0000000005/`|`[0,1,2,3,4,{}]`|`start` or `end` of nested object|
+|`:0000000005/key`|`[0,1,2,3,4,{"key":"value"}]`|`key` in nested object of the 6th element of the array. `eventValue` is `value`|
+|`:0000000005/key:0000000001`|`[0,1,2,3,4,{"key":[0,1]]`|index 1 in nested array of nested object of the 6th element of the array. `eventValue` is `1`|
+
+A `:` is used to denote an array, and a `/` for an object. Object keys are then post-fixed to `/`. Array indices are post-fixed, fixed-width, to `:`. The reason for the weird numbering syntax for array ordinal position is that the fixed width allows use of the shells' glob syntax, rather than a call out to `grep` - the width permits 99,999,999 entries in an array. An empty key in a JSON object would cause a path fragment of `//`.
+
+Matching the `jsonreader_path` can be done using the helper function `jsonreader_matches()`. The glob expression to match array indices can use the constant `jsonreader_path_index`.
 
 ***
-#### `jsonreader_matches`
+#### `jsonreader_matches()`
 
 |Parameter|Value|Optional|
 |---------|-----|--------|
