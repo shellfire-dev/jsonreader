@@ -400,7 +400,7 @@ _jsonreader_skipFinalWhitespace()
 			;;
 		
 			*)
-				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not non-whitespace after root value"
+				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect non-whitespace '$character' after root value"
 			;;
 		
 		esac
@@ -631,6 +631,7 @@ _jsonreader_next()
 	fi
 	
 	IFS='' read -r character
+	printf 'X%sX\n' "$character" 1>&2
 }
 
 _jsonreader_errorEndOfFileIfNotParsingRootNumber()
