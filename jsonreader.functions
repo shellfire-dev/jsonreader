@@ -108,8 +108,9 @@ _jsonreader_parseArray()
 {
 	local originalPath="$jsonreader_path"
 	local jsonreader_path="${originalPath}:"
+	local parentEventKind="$eventKind"
 	local eventKind=array
-	_jsonreader_raiseEvent start ''
+	_jsonreader_raiseEvent start "$parentEventKind"
 	
 	local oldEventIndex=$eventIndex
 	if core_variable_isSet key; then
@@ -125,13 +126,13 @@ _jsonreader_parseArray()
 		if [ "$character" = ']' ]; then
 			jsonreader_path="${originalPath}:"
 			
-			local count=$((eventIndex+1))
+			local eventCount=$((eventIndex+1))
 			eventIndex=$oldEventIndex
 			if core_variable_isSet oldEventKey; then
 				eventKey="$oldEventKey"
 			fi
 			
-			_jsonreader_raiseEvent end $count
+			_jsonreader_raiseEvent end "$parentEventKind"
 			return 0
 		fi
 		
@@ -154,8 +155,9 @@ _jsonreader_parseObject()
 {
 	local originalPath="$jsonreader_path"
 	local jsonreader_path="${originalPath}/"
+	local parentEventKind="$eventKind"
 	local eventKind=object
-	_jsonreader_raiseEvent start ''
+	_jsonreader_raiseEvent start "$parentEventKind"
 	
 	local oldEventIndex=$eventIndex
 	if core_variable_isSet key; then
@@ -171,13 +173,13 @@ _jsonreader_parseObject()
 		if [ "$character" = '}' ]; then
 			jsonreader_path="${originalPath}/"
 			
-			local count=$((eventIndex+1))
+			local eventCount=$((eventIndex+1))
 			eventIndex=$oldEventIndex
 			if core_variable_isSet oldEventKey; then
 				eventKey="$oldEventKey"
 			fi
 			
-			_jsonreader_raiseEvent end $count
+			_jsonreader_raiseEvent end "$parentEventKind"
 			return 0
 		fi
 		

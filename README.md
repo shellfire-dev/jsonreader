@@ -146,9 +146,10 @@ The callback function is passed no arguments, but has the following variables av
 |--------|-----------|
 |`eventKind`|The kind of event. One of `object`, `array` or `root` (if this is a solitary value; rare)|
 |`eventVariant`|The `start` or `end` of an object or array. The type of value: `boolean` (including null), `number` or `string`|
-|`eventValue`|Empty for `start`. Field count for `end`. `null`, `true` or `false` for boolean. Number or string. Numbers have exponent casing normalised to `E`|
-|`eventIndex`|Field index for `value` in array or object or 0 if value is a `root`. At `start` and `end`, field index in parent (this is logical but not obvious)|
+|`eventValue`|The parent `eventKind` for `start` and `end`. `null`, `true` or `false` for boolean. Number or string. Numbers have exponent casing normalised to `E`|
+|`eventIndex`|Field index (zero-based) for `value` in array or object or 0 if value is a `root`. At `start` and `end`, field index in parent (this is logical but not obvious)|
 |`eventKey`|Field key for objects. Unset for arrays or if value is a `root`. At `start` and `end`, set to field key in parent if parent is an object.|
+|`eventCount`|Only valid for `end`. Count of fields parsed.|
 |`jsonreader_path`|A path suitable for globbing representing where in the JSON we are.|
 
 ##### `jsonreader_path`
@@ -157,13 +158,13 @@ The callback function is passed no arguments, but has the following variables av
 |Example|Sample JSON|Explanation
 |-------|-----------|----------|
 |_(empty)_|`true`|Only occurs for a `root` event|
-|`/`|`{"key":"value"}`|`start` or `end` of object|
+|`/`|`{"key":"value"}`|`start` or `end` of object. `start` has an `eventValue` of `root` and an `eventKind` of `object`.|
 |`/key`|`{"key":"value"}`|`string` of key. `eventKey` is `key`, `eventIndex` is 0, `eventVariant` is `string`, `eventKind` is `object`|
-|`/key/`|`{"key":{"nested":"value"}}}`|`start` or `end` of nested object|
+|`/key/`|`{"key":{"nested":"value"}}}`|`start` or `end` of nested object. `end` has an `eventCount` of `1`. `start` and `end` have an `eventValue` of `object.`|
 |`/key/nested`|`{"key":{"nested":"value"}}}`|`string` of `nested`|
 |`:`|`["value"]`|`start` or `end` of array|
 |`:0000000005`|`[0,1,2,3,4,5.1e4]`|value of 6th element of the array (`5.1E4`)|
-|`:0000000005/`|`[0,1,2,3,4,{}]`|`start` or `end` of nested object|
+|`:0000000005/`|`[0,1,2,3,4,{}]`|`start` or `end` of nested object. `start` has an `eventValue` of `array` and an `eventKind` of `object`|
 |`:0000000005/key`|`[0,1,2,3,4,{"key":"value"}]`|`key` in nested object of the 6th element of the array. `eventValue` is `value`|
 |`:0000000005/key:0000000001`|`[0,1,2,3,4,{"key":[0,1]]`|index 1 in nested array of nested object of the 6th element of the array. `eventValue` is `1`|
 
