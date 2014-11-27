@@ -75,7 +75,7 @@ _github_api_v3_errorMessageExit()
 		fi
 		
 		if jsonreader_eventMatches "/errors:${jsonreader_path_index}/" end; then
-			core_variable_array_append errors "There is the error (number $arrayIndex) '$code' in resource '$resource's field '$field'."
+			core_variable_array_append errors "There is the error (number $eventIndex) '$code' in resource '$resource's field '$field'."
 		fi
 	}
 	

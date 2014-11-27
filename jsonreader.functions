@@ -132,14 +132,14 @@ _jsonreader_parseArray()
 			return 0
 		fi
 		
-		if [ $arrayIndex -ne 0 ]; then
+		if [ $eventIndex -ne 0 ]; then
 			if [ "$character" != ',' ]; then
 				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in array"
 			fi
 			_jsonreader_skipWhitespace
 		fi
 		
-		jsonreader_path="${originalPath}:$(printf '%08d' "$arrayIndex")"
+		jsonreader_path="${originalPath}:$(printf '%08d' "$eventIndex")"
 		_jsonreader_parseValue
 		
 		eventIndex=$((eventIndex+1))
@@ -175,7 +175,7 @@ _jsonreader_parseObject()
 			return 0
 		fi
 		
-		if [ $objectIndex -ne 0 ]; then
+		if [ $eventIndex -ne 0 ]; then
 			if [ "$character" != ',' ]; then
 				core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' instead of comma in object"
 			fi
