@@ -38,11 +38,19 @@ jsonreader_parse()
 	local pushBackForNumberParsing=''
 	local eofIsAllowedInParsingNumberBecauseThisIsRootValue=yes
 	local jsonreader_path=''
+
+	local TMP_FILE
+	core_temporaryFiles_newFileToRemoveOnExit
+	local singleCharactersFile="$TMP_FILE"
 	
-	core_file_characterByCharacter "$jsonFilePath" \
-		_jsonreader_skipWhitespace \
-		_jsonreader_parseValue \
+	core_file_characterByCharacterCreate "$jsonFilePath" "$singleCharactersFile"
+	{
+		_jsonreader_skipWhitespace
+		_jsonreader_parseValue
 		_jsonreader_skipFinalWhitespace
+	} <"$singleCharactersFile"
+	
+	rm -f "$singleCharactersFile"
 }
 
 _jsonreader_raiseEvent()
@@ -80,7 +88,7 @@ _jsonreader_parseValue()
 		;;
 		
 		'"')
-			_jsonreader_parseString false
+			_jsonreader_parseString true
 		;;
 		
 		'-'|'0'|'1'|'2'|'3'|'4'|'5'|'6'|'7'|'8'|'9')
@@ -116,7 +124,7 @@ _jsonreader_parseArray()
 	local oldEventKey="$eventKey"
 	
 	local eventIndex=0
-	local eventKey
+	local eventKey=''
 	while true
 	do
 		_jsonreader_skipWhitespace
@@ -159,7 +167,7 @@ _jsonreader_parseObject()
 	local oldEventKey="$eventKey"
 	
 	local eventIndex=0
-	local eventKey
+	local eventKey=''
 	while true
 	do
 		_jsonreader_skipWhitespace
@@ -186,7 +194,7 @@ _jsonreader_parseObject()
 			core_exitError $core_commandLine_exitCode_DATAERR "JSON parsing did not expect '$character' to start object key"
 		fi
 		
-		_jsonreader_parseString true
+		_jsonreader_parseString false
 		eventKey="$buffer"
 		
 		jsonreader_path="${originalPath}/"
@@ -361,7 +369,8 @@ _jsonreader_initialise()
 	_jsonreader_SP=' '
 	_jsonreader_HT="$(printf '\t')"
 	_jsonreader_CR="$(printf '\r')"
-	_jsonreader_LF=''
+	_jsonreader_LF='
+'
 }
 
 _jsonreader_errorEndOfFile()
@@ -630,8 +639,18 @@ _jsonreader_next()
 		return
 	fi
 	
+	set +e
 	IFS='' read -r character
-	printf 'X%sX\n' "$character" 1>&2
+	local exitCode=$?
+	set -e
+	if [ $exitCode -ne 0 ]; then
+		return 1
+	fi
+	
+	if [ -z "$character" ]; then
+		character='
+'
+	fi
 }
 
 _jsonreader_errorEndOfFileIfNotParsingRootNumber()
