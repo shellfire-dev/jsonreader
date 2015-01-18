@@ -9,7 +9,7 @@ These are both highly unlikely.
 
 ## Compatibility
 
-* Tag [`release_2015.0117.1750-1`](https://github.com/shellfire-dev/version/releases/tag/release_2015.0117.1750-1) is compatible with [shellfire] release [`release_2015.0117.1750-1`](https://github.com/shellfire-dev/shellfire/releases/tag/release_2015.0117.1750-1).
+* Tag [`release_2015.0117.1750-1`](https://github.com/shellfire-dev/jsonreader/releases/tag/release_2015.0117.1750-1) is compatible with [shellfire] release [`release_2015.0117.1750-1`](https://github.com/shellfire-dev/shellfire/releases/tag/release_2015.0117.1750-1).
 
 ## Overview
 
